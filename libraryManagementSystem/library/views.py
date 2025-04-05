@@ -1,15 +1,16 @@
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from .models import Book
-from .serializers import BookSerializer
-from .models import User
-from .serializers import UserSerializer
-from .models import Book, Transaction
-from .serializers import BookSerializer, TransactionSerializer
+from .models import Book, User, Transaction
+from .serializers import BookSerializer, UserSerializer, TransactionSerializer
 from rest_framework.permissions import IsAuthenticated
+from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from datetime import datetime
 
 class BookView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def get(self, request):
         books = Book.objects.all()
         serializer = BookSerializer(books, many=True)
@@ -23,6 +24,8 @@ class BookView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class UserView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def get(self, request):
         users = User.objects.all()
         serializer = UserSerializer(users, many=True)
@@ -35,8 +38,9 @@ class UserView(APIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
 class CheckoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def post(self, request):
         book_id = request.data['book_id']
         user_id = request.data['user_id']
@@ -50,6 +54,8 @@ class CheckoutView(APIView):
         return Response({'message': 'Book is not available'}, status=status.HTTP_400_BAD_REQUEST)
 
 class ReturnView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def post(self, request):
         transaction_id = request.data['transaction_id']
         transaction = Transaction.objects.get(id=transaction_id)
@@ -60,14 +66,17 @@ class ReturnView(APIView):
         transaction.save()
         return Response({'message': 'Book returned successfully'}, status=status.HTTP_201_CREATED)
 
-
 class AvailableBooksView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def get(self, request):
         available_books = Book.objects.filter(number_of_copies__gt=0)
         serializer = BookSerializer(available_books, many=True)
         return Response(serializer.data)
 
 class SearchBooksView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def get(self, request):
         query = request.GET.get('query')
         books = Book.objects.filter(title__icontains=query) | Book.objects.filter(author__icontains=query) | Book.objects.filter(isbn__icontains=query)
@@ -90,3 +99,12 @@ class RegisterView(APIView):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        data['username'] = self.user.username
+        return data
+
+class MyTokenObtainPairView(TokenObtainPairView):
+    serializer_class = MyTokenObtainPairSerializer
